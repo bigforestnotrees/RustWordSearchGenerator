@@ -37,7 +37,7 @@ pub struct WordSearch {
 impl WordSearch {
     pub fn new(words: &[&str], seeded: bool, size: i64) -> Option<Self> {
         if size < 5 || words.len() > (size as usize).pow(2) {
-            eprintln!("1");
+            eprintln!("Size must be greater than 5, and the number of words in the word list must be smaller than size squared.");
             return None;
         }
 
@@ -178,7 +178,7 @@ impl WordSearch {
                 }
 
                 if possible_dirs.len() != possible_pos.len() {
-                    eprintln!("2");
+                    eprintln!("Error in processing: mismatch between buffer lengths.");
                     return None;
                 }
 
