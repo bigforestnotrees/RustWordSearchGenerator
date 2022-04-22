@@ -93,7 +93,7 @@ impl WordSearch {
         let mut added_words = Vec::<Word>::new();
 
         while !words_by_len.is_empty() {
-            let current_word = words_by_len.get(0)?;
+            let current_word = words_by_len.get(0).unwrap();
 
             let mut possible_intersected_words = Vec::with_capacity((size * size) as usize);
 
@@ -258,7 +258,7 @@ impl WordSearch {
             let choice: Word;
 
             if possible_intersected_words.len() != 0 && rng.gen_bool(0.5) {
-                let temp = possible_intersected_words
+                let temp: &Word = possible_intersected_words
                     .index(rng.gen::<usize>() % possible_intersected_words.len());
                 choice = Word {
                     position: temp.position,
