@@ -5,6 +5,8 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::ops::Index;
 
+use rayon::prelude::*;
+
 type X = i64;
 type Y = i64;
 type Point = (X, Y);
@@ -35,14 +37,13 @@ pub struct WordSearch {
 }
 
 impl WordSearch {
-    pub fn new(words: &[&str], seeded: bool, size: i64) -> Option<Self> {
+    pub fn new(words: &[&str], seeded: bool, size: i64) -> Result<Self, &'static str> {
         if size < 5 || words.len() > (size as usize).pow(2) {
-            eprintln!("Size must be greater than 5, and the number of words in the word list must be smaller than size squared.");
-            return None;
+            return Err("Size must be greater than 5, and the number of words in the word list must be smaller than size squared.");
         }
 
         if let Some(value) = validation(words, size) {
-            return value;
+            return Err("Invalid string provided.");
         }
 
         let mut rng: SmallRng;
@@ -87,11 +88,10 @@ impl WordSearch {
             size: size,
         };
 
-
         let mut added_words = Vec::<Word>::new();
 
         while !words_by_len.is_empty() {
-            let current_word = words_by_len.get(0)?.clone();
+            let current_word = words_by_len.get(0).unwrap().clone();
 
             if current_word.is_empty() {
                 break;
@@ -99,7 +99,7 @@ impl WordSearch {
 
             let mut possible_intersected_words = Vec::<Word>::with_capacity((size * size) as usize);
 
-            for added_word in &added_words {
+            let errs = (&added_words).par_iter().map(|added_word| {
                 let mut collision_positions = Vec::<Point>::new();
 
                 let pos = added_word.position;
@@ -159,12 +159,12 @@ impl WordSearch {
 
                 for (i, pos) in (&possible_pos).into_iter().enumerate() {
                     for j in 0..current_word.len() {
-                        let x = pos.0 + j as i64 * possible_dirs.get(i)?.0;
-                        let y = pos.1 + j as i64 * possible_dirs.get(i)?.1;
+                        let x = pos.0 + j as i64 * possible_dirs.get(i).unwrap().0;
+                        let y = pos.1 + j as i64 * possible_dirs.get(i).unwrap().1;
 
                         if (&board).board.contains_key(&(x, y))
-                            && (&board).board.get(&(x, y))? != &' '
-                            && (&board).board.get(&(x, y))? != &current_word.chars().nth(j).unwrap()
+                            && (&board).board.get(&(x, y)).unwrap() != &' '
+                            && (&board).board.get(&(x, y)).unwrap() != &current_word.chars().nth(j).unwrap()
                             && !to_remove.contains(&i)
                         {
                             to_remove.push(i);
@@ -178,18 +178,27 @@ impl WordSearch {
                 }
 
                 if possible_dirs.len() != possible_pos.len() {
-                    eprintln!("Error in processing: mismatch between buffer lengths.");
-                    return None;
+                    return Err("Error in processing: mismatch between buffer lengths.");
                 }
 
                 if !possible_pos.is_empty() {
+                    let mut poss: Vec<Word> = Vec::new();
                     for (i, pos) in (&possible_pos).into_iter().enumerate() {
-                        possible_intersected_words.push(Word {
+                        poss.push(Word {
                             word: current_word.clone(),
                             position: *pos,
-                            direction: *possible_dirs.get(i)?,
+                            direction: *possible_dirs.get(i).unwrap(),
                         });
                     }
+                    return Ok(poss);
+                }
+                Ok(Vec::new())
+            }).collect::<Vec<Result<Vec<Word>, &str>>>();
+
+            for i in errs {
+                match i {
+                    Ok(_) => continue,
+                    Err(i)=> return Err(i),
                 }
             }
 
@@ -210,14 +219,15 @@ impl WordSearch {
                             if board
                                 .board
                                 .contains_key(&(x + i as i64 * dir.0, y + i as i64 * dir.1))
-                                && 
-                                board.board.get(&(x + i as i64 * dir.0, y + i as i64 * dir.1))? != &' '
                                 && board
                                     .board
-                                    .get(&(x + i as i64 * dir.0, y + i as i64 * dir.1))?
-                                    != &current_word.chars().nth(i)?
+                                    .get(&(x + i as i64 * dir.0, y + i as i64 * dir.1)).unwrap()
+                                    != &' '
+                                && board
+                                    .board
+                                    .get(&(x + i as i64 * dir.0, y + i as i64 * dir.1)).unwrap()
+                                    != &current_word.chars().nth(i).unwrap()
                             {
-                                
                                 broke = true;
                                 break;
                             }
@@ -244,16 +254,15 @@ impl WordSearch {
                     word: temp.word.clone(),
                 };
             } else if possible_single_words.len() != 0 {
-                let temp = possible_single_words
-                    .index(rng.gen::<usize>() % possible_single_words.len());
+                let temp =
+                    possible_single_words.index(rng.gen::<usize>() % possible_single_words.len());
                 choice = Word {
                     position: temp.position,
                     direction: temp.direction,
                     word: temp.word.clone(),
                 }
             } else {
-                eprintln!("Could not find a position for the word on the board!");
-                return None;
+                return Err("Could not find a position for the word on the board!");
             }
 
             let pos = choice.position;
@@ -270,10 +279,10 @@ impl WordSearch {
 
         for (pos, c) in board.board {
             if c != ' ' {
-               word_search.board.insert(pos, c);
+                word_search.board.insert(pos, c);
             }
         }
-        Some(word_search)
+        Ok(word_search)
     }
 }
 

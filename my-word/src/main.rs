@@ -25,6 +25,6 @@ fn main() {
         "after",
         "again",
         "against",
-    ], false, 100);
+    ], false, 30);
     println!("{}", w.unwrap());
 }
