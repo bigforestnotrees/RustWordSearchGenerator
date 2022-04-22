@@ -1,5 +1,8 @@
 use wordsearch::wordsearch;
+use std::env;
+
 fn main() {
-    wordsearch::WordSearch::new(&["Hello", "World"], true, 5);
-    println!("Hello, world!");
+    env::set_var("RUST_BACKTRACE", "1");
+    let w = wordsearch::WordSearch::new(&["Hello", "World"], false, 5);
+    println!("{}", w.unwrap());
 }
