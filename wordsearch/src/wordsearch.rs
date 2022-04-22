@@ -97,7 +97,7 @@ impl WordSearch {
                 break;
             }
 
-            let mut possible_intersected_words = Vec::<Word>::new();
+            let mut possible_intersected_words = Vec::<Word>::with_capacity((size * size) as usize);
 
             for added_word in &added_words {
                 let mut collision_positions = Vec::<Point>::new();
@@ -194,7 +194,7 @@ impl WordSearch {
             }
 
             let end: i64 = current_word.len() as i64 - 1;
-            let mut possible_single_words = Vec::<Word>::new();
+            let mut possible_single_words = Vec::<Word>::with_capacity((size * size) as usize);
 
             for dir in DIRSET {
                 for (x, y) in board.board.keys() {
