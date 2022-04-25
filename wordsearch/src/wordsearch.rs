@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use regex::Regex;
@@ -46,20 +47,19 @@ impl WordSearch {
             return Err("Invalid string provided.");
         }
 
-        let mut rng: SmallRng;
-        if seeded {
-            rng = SmallRng::from_entropy()
-        } else {
-            rng = SmallRng::from_seed([0; 32])
-        }
+        let mut rng: SmallRng = match seeded {
+            true => SmallRng::from_entropy(),
+            false => SmallRng::from_seed([0; 32]),
+        };
 
+        // Fill the map with random characters
         let mut word_search = WordSearch {
             board: (0..size)
                 .map(|a| {
                     (0..size)
                         .map(|b| {
                             let idx = rng.gen_range(0..CHARSET.len());
-                            ((b as X, a as Y), CHARSET[idx] as char)
+                            ((b, a), CHARSET[idx] as char)
                         })
                         .collect::<Vec<((i64, i64), char)>>()
                 })
@@ -67,14 +67,16 @@ impl WordSearch {
                 .collect(),
             size: size,
         };
-        let mut words_by_len: Vec<String> = Vec::new();
-        for s in words {
-            words_by_len.push(s.to_uppercase());
-        }
 
-        words_by_len.sort();
-        // Force it to be uppercase
-        words_by_len = words_by_len.into_iter().rev().collect();
+        // Get all the words from the input list in reverse alphabetical order,
+        // and in upper case
+        let mut words_by_len: Vec<String> = words
+            .iter()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_uppercase())
+            .sorted()
+            .rev()
+            .collect();
 
         let mut board = WordSearch {
             board: (0..size)
@@ -91,21 +93,17 @@ impl WordSearch {
         let mut added_words = Vec::<Word>::new();
 
         while !words_by_len.is_empty() {
-            let current_word = words_by_len.get(0).unwrap().clone();
+            let current_word = words_by_len.get(0).unwrap();
 
-            if current_word.is_empty() {
-                break;
-            }
-
-            let mut possible_intersected_words = Vec::<Word>::with_capacity((size * size) as usize);
+            let mut possible_intersected_words = Vec::with_capacity((size * size) as usize);
 
             let errs = (&added_words).par_iter().map(|added_word| {
-                let mut collision_positions = Vec::<Point>::new();
+                let mut collision_positions: Vec<Point> = Vec::new();
 
                 let pos = added_word.position;
                 let dir = added_word.direction;
 
-                let mut collision_chars = HashSet::<char>::new();
+                let mut collision_chars = HashSet::new();
 
                 for c in current_word.chars().collect::<HashSet<char>>() {
                     for (i, c2) in added_word.word.chars().enumerate() {
@@ -117,8 +115,8 @@ impl WordSearch {
                     }
                 }
 
-                let mut possible_dirs = Vec::<Direction>::new();
-                let mut possible_pos = Vec::<Point>::new();
+                let mut possible_dirs: Vec<Direction> = Vec::new();
+                let mut possible_pos: Vec<Point> = Vec::new();
 
                 for point in collision_positions {
                     for (i, c) in current_word.chars().enumerate() {
@@ -155,22 +153,36 @@ impl WordSearch {
                         }
                     }
                 }
-                let mut to_remove = Vec::<usize>::new();
 
-                for (i, pos) in (&possible_pos).into_iter().enumerate() {
-                    for j in 0..current_word.len() {
-                        let x = pos.0 + j as i64 * possible_dirs.get(i).unwrap().0;
-                        let y = pos.1 + j as i64 * possible_dirs.get(i).unwrap().1;
+                let to_remove = (&possible_pos)
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(i, pos)| {
+                        (0..current_word.len())
+                            .map(|j| {
+                                let dirs: Option<&Point> = possible_dirs.get(*i);
 
-                        if (&board).board.contains_key(&(x, y))
-                            && (&board).board.get(&(x, y)).unwrap() != &' '
-                            && (&board).board.get(&(x, y)).unwrap() != &current_word.chars().nth(j).unwrap()
-                            && !to_remove.contains(&i)
-                        {
-                            to_remove.push(i);
-                        }
-                    }
-                }
+                                if dirs.is_none() {
+                                    return false;
+                                }
+
+                                let x = pos.0 + j as i64 * dirs.unwrap().0;
+                                let y = pos.1 + j as i64 * dirs.unwrap().1;
+
+                                match (&board).board.get(&(x, y)) {
+                                    Some(c) => {
+                                        if c != &' ' && c != &current_word.chars().nth(j).unwrap() {
+                                            true;
+                                        }
+                                        false
+                                    }
+                                    None => false,
+                                }
+                            })
+                            .any(|a| a)
+                    })
+                    .map(|(i, _)| i)
+                    .collect::<Vec<usize>>();
 
                 for i in to_remove.into_iter().rev() {
                     possible_dirs.remove(i);
@@ -246,7 +258,7 @@ impl WordSearch {
             let choice: Word;
 
             if possible_intersected_words.len() != 0 && rng.gen_bool(0.5) {
-                let temp = possible_intersected_words
+                let temp: &Word = possible_intersected_words
                     .index(rng.gen::<usize>() % possible_intersected_words.len());
                 choice = Word {
                     position: temp.position,

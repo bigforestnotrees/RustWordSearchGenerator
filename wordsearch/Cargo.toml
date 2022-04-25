@@ -9,3 +9,11 @@ edition = "2021"
 rayon = "1.5.2"
 regex = "1.5.5"
 rand = {version="0.8.5", features=["small_rng"]}
+itertools = "0.10.3"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "bench"
+harness = false
